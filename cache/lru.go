@@ -2,7 +2,6 @@ package cache
 
 import (
 	"errors"
-	"fmt"
 	"reflect"
 	"strconv"
 	"sync"
@@ -305,7 +304,6 @@ func (cache *LRUCache) Cron() {
 			}
 		case <-time.After(time.Duration(cache.Period) * time.Millisecond * 1000):
 			// Check for expiration of all keys
-			fmt.Println("Cron")
 			for key := range cache.Items {
 				if cache.expired(key) == true {
 					cache.evict(key, true)
