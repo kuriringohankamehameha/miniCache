@@ -40,7 +40,7 @@ func LoadCache(filepath string) (*LRUCache, error) {
 
 	for key, value := range cache.Items {
 		value.evictionNode = &DLLNode{
-			value: key,
+			value: &key,
 			next:  nil,
 			prev:  nil,
 		}

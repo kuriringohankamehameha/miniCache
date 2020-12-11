@@ -1,7 +1,6 @@
 package cache
 
 import (
-	"errors"
 	"reflect"
 	"strconv"
 	"sync"
@@ -44,7 +43,7 @@ func NewLRUCache(size int64) *LRUCache {
 		Length:       0,
 		Size:         size,
 		Period:       0,
-		evictionList: NewDLL(EvictionCapacity),
+		evictionList: NewDLL(int(size)),
 	}
 	return cache
 }
@@ -104,7 +103,7 @@ func (cache *LRUCache) Stats() (string, error) {
 	stats += "Eviction Size: " + strconv.Itoa(cache.evictionList.Size) + " "
 	stats += "Eviction list:'"
 	for i, temp := 0, cache.evictionList.list; i < cache.evictionList.Size; i, temp = i+1, temp.next {
-		stats += " (Key): " + temp.value + ","
+		stats += " (Key): " + *(temp.value) + ","
 	}
 	stats += "'\n"
 	usage, _ := cache.getMemoryUsage()
@@ -188,16 +187,9 @@ func (cache *LRUCache) get(key string, Value interface{}) error {
 	if err != nil {
 		return err
 	}
-
-	if cache.evictionList.Size >= cache.evictionList.Capacity {
-		err = cache.evictionList.removeTail()
-		if err != nil {
-			return err
-		}
-	}
 	if entry.evictionNode == nil {
 		entry.evictionNode = &DLLNode{
-			value: key,
+			value: &key,
 			prev:  nil,
 			next:  nil,
 		}
@@ -228,24 +220,27 @@ func (cache *LRUCache) set(key string, Value interface{}, ttl int64) error {
 		Ttl:       ttl,
 		Timestamp: makeTimestamp(),
 		evictionNode: &DLLNode{
-			value: key,
+			value: &key,
 			prev:  nil,
 			next:  nil,
 		},
 	}
 	node := cache.Items[key].evictionNode
 	if ok == false {
-		cache.Length++
-	} else {
 		if cache.Length >= cache.Size {
-			return errors.New("cache is full")
+			ptr, err := cache.evictionList.removeTail()
+			if err != nil {
+				return err
+			}
+			key = *ptr
+			err = cache.evict(key, false)
+			if err != nil {
+				return err
+			}
 		}
+		cache.Length++
 	}
 	if cache.evictionList.Size >= cache.evictionList.Capacity {
-		err = cache.evictionList.removeTail()
-		if err != nil {
-			return err
-		}
 	} else {
 		err = cache.evictionList.shiftToHead(node, true)
 		if err != nil {
@@ -285,7 +280,7 @@ func (cache *LRUCache) getMemoryUsage() (uintptr, error) {
 		usage += size
 	}
 	for curr, node := 0, cache.evictionList.list; curr < cache.evictionList.Size; curr, node = curr+1, node.next {
-		usage += reflect.Indirect(reflect.ValueOf(node)).Type().Size() + uintptr(len(node.value)) + reflect.Indirect(reflect.ValueOf(node.next)).Type().Size() + reflect.Indirect(reflect.ValueOf(node.prev)).Type().Size()
+		usage += reflect.Indirect(reflect.ValueOf(node)).Type().Size() + uintptr(len(*(node.value))) + reflect.Indirect(reflect.ValueOf(node.next)).Type().Size() + reflect.Indirect(reflect.ValueOf(node.prev)).Type().Size()
 	}
 	return usage, nil
 }
