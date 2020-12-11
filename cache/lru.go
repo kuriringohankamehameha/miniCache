@@ -304,11 +304,13 @@ func (cache *LRUCache) Cron() {
 			}
 		case <-time.After(time.Duration(cache.Period) * time.Millisecond * 1000):
 			// Check for expiration of all keys
+			cache.lock.Lock()
 			for key := range cache.Items {
 				if cache.expired(key) == true {
-					cache.evict(key, true)
+					cache.evict(key, false)
 				}
 			}
+			cache.lock.Unlock()
 		}
 	}
 }
